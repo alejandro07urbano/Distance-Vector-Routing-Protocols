@@ -3,5 +3,7 @@
 
 # Authors
 • Alejandro Urbano 
-• Emmanuel Gonzalez 
+
+• Emmanuel Gonzalez
+
 • Jonathan Garcia 
