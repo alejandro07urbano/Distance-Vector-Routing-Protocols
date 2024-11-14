@@ -75,7 +75,9 @@ public class DistanceVectorRouting {
             }
 
             Path filePath = Paths.get(resourceUrl.toURI());
-            Server server = new Server(filePath.toString());
+            Server server = new Server();
+            String status = server.readTopologyFile(filePath.toString());
+            System.out.println("server " + status);
             System.out.println(server);
         } catch(URISyntaxException e) {
             e.printStackTrace();

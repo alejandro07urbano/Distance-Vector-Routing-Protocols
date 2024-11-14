@@ -30,24 +30,12 @@ public class Server extends Thread {
      * Initializes instance variables and calls a function that reads
      * the topology file. It also validates that the user's ip is in the
      * topology file.
-     * @param topologyName The name of the topology file
      */
-    public Server(String topologyName) {
+    public Server() {
         servers = new ArrayList<>();
         neighbors = new ArrayList<>();
         ipAddress = getIPAddress();
         nextHop = new HashMap<>();
-        readTopologyFile(topologyName);
-
-        validateServerId();
-
-        RoutingEntry server = servers.get(serverId-1);
-        server.cost = 0;
-        try {
-            socket = new DatagramSocket(server.serverPort);
-        } catch (SocketException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     /**
@@ -56,6 +44,12 @@ public class Server extends Thread {
      */
     public void run() {
         running = true;
+        RoutingEntry server = getServer(serverId);
+        try {
+            socket = new DatagramSocket(server.serverPort);
+        } catch (SocketException e) {
+            throw new RuntimeException(e);
+        }
 
         while (running) {
             DatagramPacket packet
@@ -92,19 +86,20 @@ public class Server extends Thread {
      * by calling a function that checks for the ip of the server and looks for it
      * in the list of servers. If the id is found, it will check if the id matches
      * the last lines of the topology file where neighbor cost is defined.
+     * @return Returns a string that describes any error
      */
-    private void validateServerId() {
+    private String validateServerId() {
         int serverIdFromIp = getServerId();
         if(serverIdFromIp == -1) {
-            System.out.println("Your ip is not in the topology file.");
-            System.exit(1);
+            return "ERROR: Your ip is not in the topology file.";
         }
         if(numOfNeighbors > 0 && serverId != serverIdFromIp) {
-            System.out.println("Error in topology file: Incorrect server id in neighbor cost");
-            System.exit(1);
+            return "ERROR: Actual server ID does not match the neighbor cost lines in topology file.";
         }
         serverId = serverIdFromIp;
-
+        RoutingEntry server = getServer(serverId);
+        server.cost = 0;
+        return "SUCCESS";
     }
 
     /**
@@ -176,7 +171,7 @@ public class Server extends Thread {
      * such as numOfServers, numOfNeighbors, servers, and neighbors.
      * @param topologyName
      */
-    private void readTopologyFile(String topologyName) {
+    public String readTopologyFile(String topologyName) {
         File topologyFile = new File(topologyName);
         try {
             Scanner fileReader = new Scanner(topologyFile);
@@ -188,9 +183,12 @@ public class Server extends Thread {
                 String[] lineEntry = fileReader.nextLine().split(" ");
                 int id = Integer.parseInt(lineEntry[0]);
                 String ip = lineEntry[1];
+                if(!ip.contains(".")) return "ERROR: Number of servers does not match server lines in the topology file";
+
                 int port = Integer.parseInt(lineEntry[2]);
                 RoutingEntry server = new RoutingEntry(ip, port, id);
-                addServer(server);
+                boolean isAdded = addServer(server);
+                if(!isAdded) return "ERROR: Duplicate server ids in topology file";
             }
             int prevServerId = -1;
             for(int i = 0; i < numOfNeighbors; i++) {
@@ -200,39 +198,42 @@ public class Server extends Thread {
                 int cost = Integer.parseInt(lineValues[2]);
 
                 if(prevServerId != -1 && serverId != prevServerId) {
-                    System.out.println("The topology file provided does not follow the correct format.");
-                    // function printing out correct format.
-                    System.exit(1);
+                    return "ERROR: Number of neighbors does not match neighbor lines in the topology file";
                 }
                 prevServerId = serverId;
                 RoutingEntry neighbor = getServer(neighborId);
+                neighbor.cost = cost;
                 neighbors.add(new RoutingEntry(neighbor, cost));
             }
             this.serverId = prevServerId;
+            return validateServerId();
         }
         catch(NumberFormatException e) {
-            System.out.println("Topology file is not in the right format");
-            System.exit(1);
+            return "ERROR: Topology file expected a numeric value";
         }
         catch(NoSuchElementException e) {
-            System.out.println("Not enough lines in topology tile");
-            System.exit(1);
+            return "ERROR: Topology file does not have enough lines";
         }
         catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
+            return "ERROR: Topology file was not found";
         }
     }
 
     /**
      * Inserts the server in the list to maintain a sorted list.
      * @param server
+     * @return Returns a boolean signifying whether it could insert.
      */
-    private void addServer(RoutingEntry server) {
+    private boolean addServer(RoutingEntry server) {
         int position = Collections.binarySearch(servers, server, Comparator.comparingInt(s -> s.serverID));
         if (position < 0) {
             position = -position - 1;
         }
+        else {
+            return false;
+        }
         servers.add(position, server);
+        return true;
     }
 
     public RoutingEntry getServer(int id) {

@@ -23,7 +23,6 @@ public class RoutingUpdateMessage {
         this.serverIPAddress = intToIp(buffer.getInt());
 
         int numOfServers = (numberOfUpdateFields - 2) / 4;
-        System.out.println(numberOfUpdateFields);
         this.routingEntries = new ArrayList<>();
         for(int i = 0; i < numOfServers; i++) {
             String ip = intToIp(buffer.getInt());
@@ -32,7 +31,6 @@ public class RoutingUpdateMessage {
             int cost = buffer.getShort() & 0xFFFF;
             this.routingEntries.add(new RoutingEntry(ip, port, id, cost));
         }
-        // ask professor about number of update fields.
     }
 
     public int getPacketSize() {
