@@ -16,7 +16,6 @@ public class Server extends Thread {
     public static ArrayList<RoutingEntry> neighbors;
 
     // serverId, nextHopServerId
-    public HashMap<Integer, Integer> nextHop;
     private boolean running;
     private byte[] buf = new byte[256];
     private int port;
@@ -35,7 +34,6 @@ public class Server extends Thread {
         servers = new ArrayList<>();
         neighbors = new ArrayList<>();
         ipAddress = getIPAddress();
-        nextHop = new HashMap<>();
     }
 
     /**
@@ -94,11 +92,12 @@ public class Server extends Thread {
             return "ERROR: Your ip is not in the topology file.";
         }
         if(numOfNeighbors > 0 && serverId != serverIdFromIp) {
-            return "ERROR: Actual server ID does not match the neighbor cost lines in topology file.";
+            return "ERROR: Server ID does not match the neighbor cost lines in topology file.";
         }
         serverId = serverIdFromIp;
         RoutingEntry server = getServer(serverId);
         server.cost = 0;
+        server.nextHopId = serverId;
         return "SUCCESS";
     }
 
@@ -202,6 +201,7 @@ public class Server extends Thread {
                 }
                 prevServerId = serverId;
                 RoutingEntry neighbor = getServer(neighborId);
+                neighbor.nextHopId = neighbor.serverID;
                 neighbor.cost = cost;
                 neighbors.add(new RoutingEntry(neighbor, cost));
             }
