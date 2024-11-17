@@ -1,0 +1,70 @@
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+class RoutingEntry {
+    private int destinationServerID;
+    private int nextHopServerID;
+    private int costOfPath;
+
+    public RoutingEntry(int destinationServerID, int nextHopServerID, int costOfPath) {
+        this.destinationServerID = destinationServerID;
+        this.nextHopServerID = nextHopServerID;
+        this.costOfPath = costOfPath;
+    }
+
+    public int getDestinationServerID() {
+        return destinationServerID;
+    }
+
+    public int getNextHopServerID() {
+        return nextHopServerID;
+    }
+
+    public int getCostOfPath() {
+        return costOfPath;
+    }
+
+    @Override
+    public String toString() {
+        return destinationServerID + " " + nextHopServerID + " " + costOfPath;
+    }
+}
+
+public class Display {
+    private List<RoutingEntry> routingTable;
+
+    public Display() {
+        routingTable = new ArrayList<>();
+    }
+
+    // Add an entry to the routing table
+    public void addEntry(int destinationServerID, int nextHopServerID, int costOfPath) {
+        routingTable.add(new RoutingEntry(destinationServerID, nextHopServerID, costOfPath));
+    }
+
+    // Display the routing table
+    public void displayRoutingTable() {
+        // Sort the routing table by destination server ID
+        Collections.sort(routingTable, Comparator.comparingInt(RoutingEntry::getDestinationServerID));
+
+        // Display the sorted routing table
+        System.out.println("Routing Table:");
+        for (RoutingEntry entry : routingTable) {
+            System.out.println(entry);
+        }
+    }
+
+    public static void main(String[] args) {
+      //  Display display = new Display();
+
+        // Example entries
+     //   display.addEntry(3, 2, 10);
+    //    display.addEntry(1, 2, 5);
+     //   display.addEntry(2, 1, 7);
+
+        // Display the routing table
+     //   display.displayRoutingTable();
+    }
+}
