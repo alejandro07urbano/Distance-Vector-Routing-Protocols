@@ -6,15 +6,18 @@ public class RoutingUpdateMessage {
     int serverPort;
     String serverIPAddress;
 
+    int receiverId;
+
     int messageSize;
 
-    ArrayList<RoutingEntry> routingEntries;
+    ArrayList<ServerNode> serverNodes;
 
-    public RoutingUpdateMessage(int numberOfUpdateFields, int serverPort, String serverIPAddress, ArrayList<RoutingEntry> routingEntries) {
+    public RoutingUpdateMessage(int receiverId, int numberOfUpdateFields, int serverPort, String serverIPAddress, ArrayList<ServerNode> routingEntries) {
+        this.receiverId = receiverId;
         this.numberOfUpdateFields = numberOfUpdateFields;
         this.serverPort = serverPort;
         this.serverIPAddress = serverIPAddress;
-        this.routingEntries = routingEntries;
+        this.serverNodes = routingEntries;
     }
     public RoutingUpdateMessage(byte[] packet) {
         ByteBuffer buffer = ByteBuffer.wrap(packet);
@@ -23,23 +26,25 @@ public class RoutingUpdateMessage {
         this.serverIPAddress = intToIp(buffer.getInt());
 
         int numOfServers = (numberOfUpdateFields - 2) / 4;
-        this.routingEntries = new ArrayList<>();
+        this.serverNodes = new ArrayList<>();
         for(int i = 0; i < numOfServers; i++) {
             String ip = intToIp(buffer.getInt());
             int port = buffer.getShort() & 0xFFFF;
             int id = buffer.getShort() & 0xFFFF;
             int cost = buffer.getShort() & 0xFFFF;
-            this.routingEntries.add(new RoutingEntry(ip, port, id, cost));
+            this.serverNodes.add(new ServerNode(ip, port, id, cost));
         }
     }
 
     public int getPacketSize() {
-        return 8 + routingEntries.size() * 10;
+        return 8 + serverNodes.size() * 10;
     }
 
-    public int getServerID() {
-        for(RoutingEntry entry : routingEntries) {
-            if(entry.serverIPAddress.equals(this.serverIPAddress)) return entry.serverID;
+    public int getSenderID() {
+        for(ServerNode entry : serverNodes) {
+            if(entry.serverIPAddress.equals(this.serverIPAddress)
+            && entry.serverPort == this.serverPort
+            ) return entry.serverID;
         }
         return -1;
     }
@@ -50,11 +55,12 @@ public class RoutingUpdateMessage {
         buffer.putShort((short)serverPort);
         buffer.putInt(ipToBytes(serverIPAddress));
 
-        for(RoutingEntry entry : routingEntries) {
-            buffer.putInt(ipToBytes(entry.serverIPAddress));
-            buffer.putShort((short)entry.serverPort);
-            buffer.putShort((short)entry.serverID);
-            buffer.putShort((short)entry.cost);
+        for(ServerNode server : serverNodes) {
+            int cost = (receiverId == server.serverID) ? server.directLinkCost : server.cost;
+            buffer.putInt(ipToBytes(server.serverIPAddress));
+            buffer.putShort((short)server.serverPort);
+            buffer.putShort((short)server.serverID);
+            buffer.putShort((short)cost);
         }
         return buffer.array();
     }

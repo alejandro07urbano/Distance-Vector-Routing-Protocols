@@ -14,30 +14,30 @@ public class DistanceVectorRouting {
     public static void main(String[] args) {
 
         // example of how to write and read message
-        ArrayList<RoutingEntry> servers = new ArrayList<>();
-        servers.add(new RoutingEntry("192.168.1.232", 3939, 4, 3));
-        servers.add(new RoutingEntry("192.168.1.233", 3940, 1, 6));
-        servers.add(new RoutingEntry("192.168.1.234", 3941, 2, 9));
-        servers.add(new RoutingEntry("192.168.0.112", 4949, 3, 0));
-        RoutingUpdateMessage message = new RoutingUpdateMessage(
-                                    2+servers.size()*4,
-                                    4949,
-                                    "192.168.0.112",
-                                    servers
-        );
+//        ArrayList<ServerNode> servers = new ArrayList<>();
+//        servers.add(new ServerNode("192.168.1.232", 3939, 4, 3));
+//        servers.add(new ServerNode("192.168.1.233", 3940, 1, 6));
+//        servers.add(new ServerNode("192.168.1.234", 3941, 2, 9));
+//        servers.add(new ServerNode("192.168.0.112", 4949, 3, 0));
+//        RoutingUpdateMessage message = new RoutingUpdateMessage(
+//                                    2+servers.size()*4,
+//                                    4949,
+//                                    "192.168.0.112",
+//                                    servers
+//        );
 
         // The getRoutingUpdatePacket returns a byte array of all the information
-        RoutingUpdateMessage test = new RoutingUpdateMessage(message.getRoutingUpdatePacket());
-        System.out.println("Current ServerID: " + test.getServerID() + "\n");
-        System.out.println("Number of update fields: " + test.numberOfUpdateFields);
-        System.out.println("Port: " + test.serverPort);
-        System.out.println("IP: " + test.serverIPAddress + "\n");
-        for(RoutingEntry entry: test.routingEntries) {
-            System.out.println("ServerID: " + entry.serverID);
-            System.out.println("ServerIP: " + entry.serverIPAddress);
-            System.out.println("ServerPort: " + entry.serverPort);
-            System.out.println("ServerCost: " + entry.cost + "\n");
-        }
+//        RoutingUpdateMessage test = new RoutingUpdateMessage(message.getRoutingUpdatePacket());
+//        System.out.println("Current ServerID: " + test.getServerID() + "\n");
+//        System.out.println("Number of update fields: " + test.numberOfUpdateFields);
+//        System.out.println("Port: " + test.serverPort);
+//        System.out.println("IP: " + test.serverIPAddress + "\n");
+//        for(ServerNode entry: test.routingEntries) {
+//            System.out.println("ServerID: " + entry.serverID);
+//            System.out.println("ServerIP: " + entry.serverIPAddress);
+//            System.out.println("ServerPort: " + entry.serverPort);
+//            System.out.println("ServerCost: " + entry.cost + "\n");
+//        }
 
         Scanner input = new Scanner(System.in);
         while(true) {
@@ -52,7 +52,12 @@ public class DistanceVectorRouting {
                     }
                     if(inputs.length > 4 && inputs[3].equals("-i")) {
                         routingUpdateInterval = Integer.parseInt(inputs[4]);
+                        RoutingUpdater ru = new RoutingUpdater(routingUpdateInterval);
+                        if(Server.running) ru.start();
                     }
+                    break;
+                case "display":
+                    Server.displayRoutingTable();
                     break;
                 default:
                     System.out.println(inputs[0] + " is not a command.");
@@ -78,7 +83,9 @@ public class DistanceVectorRouting {
             Server server = new Server();
             String status = server.readTopologyFile(filePath.toString());
             System.out.println("server " + status);
-            System.out.println(server);
+            if(!status.equals("SUCCESS")) return;
+            server.start();
+            Server.displayRoutingTable();
         } catch(URISyntaxException e) {
             e.printStackTrace();
         }

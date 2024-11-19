@@ -1,6 +1,8 @@
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.File;
+import java.lang.reflect.Array;
+import java.nio.file.Path;
 import java.util.*;
 import java.net.*;
 
@@ -12,18 +14,16 @@ import java.net.*;
 public class Server extends Thread {
 
     private DatagramSocket socket;
-    public static ArrayList<RoutingEntry> servers;
-    public static ArrayList<RoutingEntry> neighbors;
-
-    // serverId, nextHopServerId
-    private boolean running;
+    public static ArrayList<ServerNode> servers;
+    public static boolean running;
     private byte[] buf = new byte[256];
-    private int port;
+    public static int port;
     private int numOfServers;
     private int numOfNeighbors;
-    private int serverId;
+    public static int serverId;
     public int numOfUpdates = 0;
-    String ipAddress;
+    public static String ipAddress;
+    public static boolean updatingValues;
 
     /**
      * Initializes instance variables and calls a function that reads
@@ -32,8 +32,8 @@ public class Server extends Thread {
      */
     public Server() {
         servers = new ArrayList<>();
-        neighbors = new ArrayList<>();
-        ipAddress = getIPAddress();
+        updatingValues = false;
+        running = false;
     }
 
     /**
@@ -42,7 +42,7 @@ public class Server extends Thread {
      */
     public void run() {
         running = true;
-        RoutingEntry server = getServer(serverId);
+        ServerNode server = getServer(serverId);
         try {
             socket = new DatagramSocket(server.serverPort);
         } catch (SocketException e) {
@@ -57,26 +57,38 @@ public class Server extends Thread {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-
-            InetAddress address = packet.getAddress();
-            int port = packet.getPort();
-            String received
-                    = new String(packet.getData(), 0, packet.getLength());
-            buf = "This is a very long message for testing.".getBytes();
-            packet = new DatagramPacket(buf, buf.length, address, port);
-
-
-            if (received.equals("end")) {
-                running = false;
-                continue;
-            }
-            try {
-                socket.send(packet);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            RoutingUpdateMessage message = new RoutingUpdateMessage(packet.getData());
+            distanceVector(message);
         }
         socket.close();
+    }
+
+    /**
+     * Searches for better path from vector updates received from its neighbors.
+     * It works by looking through the current routing table and comparing it with
+     * the one received through the message. If it finds a better path, it will
+     * update the cost and change the next hop id.
+     * @param message The vector update message
+     * @see RoutingUpdateMessage
+     */
+    public void distanceVector(RoutingUpdateMessage message) {
+        updatingValues = true;
+        int senderId = message.getSenderID();
+        int senderCost = getServer(senderId).cost;
+        ArrayList<ServerNode> updateServers = message.serverNodes;
+        for(ServerNode destination : servers) {
+            if(destination.serverID == serverId) continue;
+            for(ServerNode updateServer : updateServers) {
+                if(destination.serverID != updateServer.serverID) continue;
+                int newCost = (updateServer.cost == Integer.MAX_VALUE) ? Integer.MAX_VALUE :
+                                                                        senderCost + updateServer.cost;
+                if(newCost < destination.cost) {
+                    destination.cost = newCost;
+                    destination.nextHopId = senderId;
+                }
+            }
+        }
+        updatingValues = false;
     }
 
     /**
@@ -87,46 +99,59 @@ public class Server extends Thread {
      * @return Returns a string that describes any error
      */
     private String validateServerId() {
-        int serverIdFromIp = getServerId();
-        if(serverIdFromIp == -1) {
-            return "ERROR: Your ip is not in the topology file.";
-        }
-        if(numOfNeighbors > 0 && serverId != serverIdFromIp) {
+        String serverIP = getIPAddress();
+        ServerNode server = getServer(serverId);
+
+        if(serverIP == null) return "ERROR: Your ip is not in the topology file.";
+
+        if(server != null && !server.serverIPAddress.equals(serverIP))
             return "ERROR: Server ID does not match the neighbor cost lines in topology file.";
-        }
-        serverId = serverIdFromIp;
-        RoutingEntry server = getServer(serverId);
+
+        ipAddress = serverIP;
+        port = server.serverPort;
         server.cost = 0;
         server.nextHopId = serverId;
         return "SUCCESS";
+    }
+
+    private String getIPAddress() {
+        ArrayList<String> ips = getIPAddresses();
+        for(ServerNode server : servers) {
+            for(int i = 0; i < ips.size(); i++) {
+                String ip = ips.get(i);
+                if(server.serverIPAddress.equals(ip)) return ip;
+            }
+        }
+        return null;
     }
 
     /**
      * Gets the IP of the computer running the server.
      * @return Will return an ipv4 address of the computer running the server
      */
-    private static String getIPAddress() {
+    private static ArrayList<String> getIPAddresses() {
+        ArrayList<String> ips = new ArrayList<>();
         try {
             Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
 
             while (networkInterfaces.hasMoreElements()) {
                 NetworkInterface networkInterface = networkInterfaces.nextElement();
+
                 Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
 
                 while (inetAddresses.hasMoreElements()) {
                     InetAddress inetAddress = inetAddresses.nextElement();
                     // Check if it's an IPv4 address and not a loopback address
                     if (inetAddress instanceof java.net.Inet4Address && !inetAddress.isLoopbackAddress()) {
-                        return inetAddress.getHostAddress();
+                        ips.add(inetAddress.getHostAddress());
                     }
                 }
             }
         } catch (SocketException e) {
             e.printStackTrace();
         }
-        return "No ipv4 addresses found";
+        return ips;
     }
-
     /**
      * Gets the server id from the topology file, it does this by looking for the
      * server's ip address in the list of servers that was listed in the topology file.
@@ -135,7 +160,7 @@ public class Server extends Thread {
      */
     public int getServerId() {
         int index = 1;
-        for(RoutingEntry server : servers) {
+        for(ServerNode server : servers) {
             if(server.serverIPAddress.equals(ipAddress)) {
                 return server.serverID;
             }
@@ -144,24 +169,14 @@ public class Server extends Thread {
         return -1;
     }
 
-    /**
-     * Not finished yet but will return the routing table for this server
-     * as a string
-     * @return Will return routing table as a string
-     */
-    @Override // change this later to the requirements on the assignment for display
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Current serverID: " + serverId + "\n");
-        for(int i = 0 ; i < servers.size(); i++){
-            RoutingEntry server = servers.get(i);
-            if(server == null) continue;
-            sb.append(server.serverID + " ")
-                .append(server.serverIPAddress + " ")
-                .append(server.serverPort + " ")
-                .append(server.cost + "\n");
+
+    // Display the routing table
+    public static void displayRoutingTable() {
+        // Display the sorted routing table
+        System.out.println("Routing Table:");
+        for (ServerNode node : servers) {
+            System.out.println(node);
         }
-        return sb.toString();
     }
 
     /**
@@ -185,7 +200,7 @@ public class Server extends Thread {
                 if(!ip.contains(".")) return "ERROR: Number of servers does not match server lines in the topology file";
 
                 int port = Integer.parseInt(lineEntry[2]);
-                RoutingEntry server = new RoutingEntry(ip, port, id);
+                ServerNode server = new ServerNode(ip, port, id);
                 boolean isAdded = addServer(server);
                 if(!isAdded) return "ERROR: Duplicate server ids in topology file";
             }
@@ -200,11 +215,12 @@ public class Server extends Thread {
                     return "ERROR: Number of neighbors does not match neighbor lines in the topology file";
                 }
                 prevServerId = serverId;
-                RoutingEntry neighbor = getServer(neighborId);
-                neighbor.nextHopId = neighbor.serverID;
+                ServerNode neighbor = getServer(neighborId);
                 neighbor.cost = cost;
-                neighbors.add(new RoutingEntry(neighbor, cost));
+                neighbor.nextHopId = neighborId;
+                neighbor.directLinkCost = cost;
             }
+            if(fileReader.hasNextLine()) return "ERROR: More neighbor lines than expected";
             this.serverId = prevServerId;
             return validateServerId();
         }
@@ -224,7 +240,7 @@ public class Server extends Thread {
      * @param server
      * @return Returns a boolean signifying whether it could insert.
      */
-    private boolean addServer(RoutingEntry server) {
+    private boolean addServer(ServerNode server) {
         int position = Collections.binarySearch(servers, server, Comparator.comparingInt(s -> s.serverID));
         if (position < 0) {
             position = -position - 1;
@@ -236,12 +252,12 @@ public class Server extends Thread {
         return true;
     }
 
-    public RoutingEntry getServer(int id) {
+    public ServerNode getServer(int id) {
         int high = servers.size()-1;
         int low = 0;
         while(low <= high) {
             int mid = low + (high - low) / 2;
-            RoutingEntry server = servers.get(mid);
+            ServerNode server = servers.get(mid);
             if(server.serverID == id) {
                 return server;
             }

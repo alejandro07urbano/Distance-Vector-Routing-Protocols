@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.net.*;
+import java.util.ArrayList;
 
 /**
  * This class will be used for sending messages and routing updates
@@ -9,14 +10,15 @@ import java.net.*;
 public class RoutingUpdater extends Thread {
     private DatagramSocket socket;
     private InetAddress address;
+    public static boolean isRunning;
+    public static int updateInterval;
+
     private byte[] buf;
 
-    public RoutingUpdater() {
+    public RoutingUpdater(int updateInterval) {
         try {
             socket = new DatagramSocket();
-            address = InetAddress.getByName("localhost");
-        } catch(UnknownHostException e) {
-            throw new RuntimeException(e);
+            this.updateInterval = updateInterval;
         }
         catch (SocketException e) {
             throw new RuntimeException(e);
@@ -24,9 +26,58 @@ public class RoutingUpdater extends Thread {
 
     }
 
+    /**
+     *
+     */
+    @Override
     public void run() {
+        isRunning = true;
+        ArrayList<ServerNode> servers = Server.servers;
+        while(isRunning) {
+            try{
+                Thread.sleep(1000*updateInterval);
+            } catch(InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            for(ServerNode server : servers) {
+                if(!server.isNeighbor()) continue;
+                while(Server.updatingValues); // wait for distance vector to finish to avoid incomplete data
+                try{
+                    byte[] routingUpdate = getMessageAsPacket(server.serverID);
+                    InetAddress address = InetAddress.getByName(server.serverIPAddress);
+                    DatagramPacket packet = new DatagramPacket(routingUpdate,
+                                            routingUpdate.length,
+                                            address,
+                            server.serverPort);
+                    socket.send(packet);
 
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
+
+    // update it so that sending link to node send directlink cost for update
+
+
+    /**
+     * Creates a routing update message for the receiver
+     * server.
+     * @param id Receiving server's id
+     * @return
+     */
+    public byte[] getMessageAsPacket(int id) {
+        RoutingUpdateMessage message = new RoutingUpdateMessage(
+                id,
+                2+Server.servers.size()*4,
+                Server.port,
+                Server.ipAddress,
+                Server.servers
+        );
+        return message.getRoutingUpdatePacket();
+    }
+
 
     public String sendEcho(String msg) {
         try {
