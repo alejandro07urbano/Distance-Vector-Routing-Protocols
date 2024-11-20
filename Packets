@@ -1,0 +1,36 @@
+public class Packets {
+
+    // Field to keep track of the number of packets
+    private int packetCount;
+
+    // Constructor to initialize the packet count
+    public DistanceVectorServer() {
+        this.packetCount = 0;
+    }
+
+    // Method to simulate receiving a packet
+    public void receivePacket() {
+        packetCount++;
+    }
+
+    // Method to display the number of packets received since the last invocation
+    public void packets() {
+        System.out.println("Number of distance vector packets received since last invocation: " + packetCount);
+        // Reset the packet count
+        packetCount = 0;
+    }
+
+    // Main method for testing the class functionality
+    public static void main(String[] args) {
+        DistanceVectorServer server = new DistanceVectorServer();
+
+        // Simulate receiving packets
+        server.receivePacket();
+        server.receivePacket();
+        server.receivePacket();
+
+        // Display and reset the packet count
+        server.packets(); // Output: 3
+
+    }
+}
