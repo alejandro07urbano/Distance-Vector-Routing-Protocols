@@ -1,6 +1,6 @@
 public class Packets {
 
-    //  Keep track of the number of packets
+     //  Keep track of the number of packets
     private int packetCount;
 
     // Constructor to begin the packet count
