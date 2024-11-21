@@ -2,48 +2,26 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 
 /**
  * This will be our driver class which will listen for user input.
  */
 public class DistanceVectorRouting {
-    static int routingUpdateInterval;
+    public static int routingUpdateInterval;
+    public static boolean waitingForInput;
 
     public static void main(String[] args) {
-
-        // example of how to write and read message
-//        ArrayList<ServerNode> servers = new ArrayList<>();
-//        servers.add(new ServerNode("192.168.1.232", 3939, 4, 3));
-//        servers.add(new ServerNode("192.168.1.233", 3940, 1, 6));
-//        servers.add(new ServerNode("192.168.1.234", 3941, 2, 9));
-//        servers.add(new ServerNode("192.168.0.112", 4949, 3, 0));
-//        RoutingUpdateMessage message = new RoutingUpdateMessage(
-//                                    2+servers.size()*4,
-//                                    4949,
-//                                    "192.168.0.112",
-//                                    servers
-//        );
-
-        // The getRoutingUpdatePacket returns a byte array of all the information
-//        RoutingUpdateMessage test = new RoutingUpdateMessage(message.getRoutingUpdatePacket());
-//        System.out.println("Current ServerID: " + test.getServerID() + "\n");
-//        System.out.println("Number of update fields: " + test.numberOfUpdateFields);
-//        System.out.println("Port: " + test.serverPort);
-//        System.out.println("IP: " + test.serverIPAddress + "\n");
-//        for(ServerNode entry: test.routingEntries) {
-//            System.out.println("ServerID: " + entry.serverID);
-//            System.out.println("ServerIP: " + entry.serverIPAddress);
-//            System.out.println("ServerPort: " + entry.serverPort);
-//            System.out.println("ServerCost: " + entry.cost + "\n");
-//        }
-
         Scanner input = new Scanner(System.in);
+
         while(true) {
+            waitingForInput = true;
             System.out.print(">> ");
-            String inputLine = input.nextLine();
-            String[] inputs = inputLine.split(" ");
+            String line = input.nextLine();
+            waitingForInput = false;
+            String[] inputs = line.split(" ");
 
             switch(inputs[0]) {
                 case "server":
@@ -53,16 +31,43 @@ public class DistanceVectorRouting {
                     if(inputs.length > 4 && inputs[3].equals("-i")) {
                         routingUpdateInterval = Integer.parseInt(inputs[4]);
                         RoutingUpdater ru = new RoutingUpdater(routingUpdateInterval);
-                        if(Server.running) ru.start();
+                        if(Server.running && !ru.isRunning) ru.start();
                     }
                     break;
                 case "display":
                     Server.displayRoutingTable();
                     break;
+                case "packets":
+                    packets();
+                    break;
+                case "disable":
+                    if(inputs.length > 1) {
+                        RoutingUpdater.disableServerLink(Integer.parseInt(inputs[1]));
+                    }
+                    break;
+                case "crash":
+                    RoutingUpdater.CrashServer();
+                    break;
                 default:
                     System.out.println(inputs[0] + " is not a command.");
             }
         }
+    }
+
+    // Safely print a message and preserve the user's input
+    public static void printMessageFromThread(String s) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(s);
+        sb.append("\n>> ");
+        sb.insert(0,'\r');
+        System.out.print(sb);
+    }
+
+    // Method to display the number of packets received since the last call
+    public static void packets() {
+        System.out.println("Number of distance vector packets received since last call: " + Server.packetCount);
+        // Reset the packet count
+        Server.packetCount = 0;
     }
 
     /**

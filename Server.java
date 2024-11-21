@@ -1,8 +1,8 @@
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.File;
-import java.lang.reflect.Array;
 import java.nio.file.Path;
+import java.sql.Array;
 import java.util.*;
 import java.net.*;
 
@@ -25,15 +25,17 @@ public class Server extends Thread {
     public static String ipAddress;
     public static boolean updatingValues;
 
+    public static int packetCount;
+
     /**
      * Initializes instance variables and calls a function that reads
      * the topology file. It also validates that the user's ip is in the
      * topology file.
      */
     public Server() {
-        servers = new ArrayList<>();
         updatingValues = false;
         running = false;
+        packetCount = 0;
     }
 
     /**
@@ -59,6 +61,7 @@ public class Server extends Thread {
             }
             RoutingUpdateMessage message = new RoutingUpdateMessage(packet.getData());
             distanceVector(message);
+            packetCount++;
         }
         socket.close();
     }
@@ -74,7 +77,11 @@ public class Server extends Thread {
     public void distanceVector(RoutingUpdateMessage message) {
         updatingValues = true;
         int senderId = message.getSenderID();
-        int senderCost = getServer(senderId).cost;
+        ServerNode senderServer = getServer(senderId);
+
+
+        DistanceVectorRouting.printMessageFromThread("RECEIVED A MESSAGE FROM SERVER " + senderId);
+        int senderCost = senderServer.cost;
         ArrayList<ServerNode> updateServers = message.serverNodes;
         for(ServerNode destination : servers) {
             if(destination.serverID == serverId) continue;
@@ -152,6 +159,7 @@ public class Server extends Thread {
         }
         return ips;
     }
+
     /**
      * Gets the server id from the topology file, it does this by looking for the
      * server's ip address in the list of servers that was listed in the topology file.
@@ -192,7 +200,7 @@ public class Server extends Thread {
             numOfServers = Integer.parseInt(fileReader.nextLine());
             numOfNeighbors = Integer.parseInt(fileReader.nextLine());
 
-
+            servers = new ArrayList<>();
             for(int i = 0; i < numOfServers; i++) {
                 String[] lineEntry = fileReader.nextLine().split(" ");
                 int id = Integer.parseInt(lineEntry[0]);
@@ -204,6 +212,7 @@ public class Server extends Thread {
                 boolean isAdded = addServer(server);
                 if(!isAdded) return "ERROR: Duplicate server ids in topology file";
             }
+
             int prevServerId = -1;
             for(int i = 0; i < numOfNeighbors; i++) {
                 String[] lineValues = fileReader.nextLine().split(" ");
@@ -220,7 +229,8 @@ public class Server extends Thread {
                 neighbor.nextHopId = neighborId;
                 neighbor.directLinkCost = cost;
             }
-            if(fileReader.hasNextLine()) return "ERROR: More neighbor lines than expected";
+            while(fileReader.hasNextLine())
+                if(fileReader.nextLine().trim() != "") return "ERROR: More neighbor lines than expected";
             this.serverId = prevServerId;
             return validateServerId();
         }
@@ -252,7 +262,7 @@ public class Server extends Thread {
         return true;
     }
 
-    public ServerNode getServer(int id) {
+    public static ServerNode getServer(int id) {
         int high = servers.size()-1;
         int low = 0;
         while(low <= high) {

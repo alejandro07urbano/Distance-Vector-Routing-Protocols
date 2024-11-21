@@ -58,33 +58,24 @@ public class RoutingUpdater extends Thread {
         }
     }
     //Alejandro Urbano 
-     public void disableServerLink(int serverId){
+     public static void disableServerLink(int serverId){
         ServerNode serverToDisable = Server.getServer(serverId);
         if(serverToDisable != null && serverToDisable.isNeighbor()){
-            serverToDisable.cost = Integer.MAX_VALUE;
-            serverToDisable.nextHopId =-1;
+            serverToDisable.directLinkCost = Integer.MAX_VALUE;
+            if(serverToDisable.nextHopId == serverId) serverToDisable.nextHopId =-1;
+
             System.out.println("Server link to " + serverId + " has been disabled.");
         }
         else{
             System.out.println("Server " + serverId + " is not a neighbor or does not exist.");
         }
-
      }
+
     //Alejandro Urbano
-    public void CrashServer(int crashedServerId){
-        ArrayList<ServerNode> servers = Server.servers;
-        for(ServerNode server : servers){
-            if(server.serverID == crashedServerId){
-                server.cost = Integer.MAX_VALUE;
-                server.nextHopId =-1;
-                System.out.println("Server " + crashedServerId + " has crashed and is now unreachable.");
-                break;
-            }
-        }
+    public static void CrashServer(){
+        isRunning = false;
+        Server.running = false;
     }
-
-    // update it so that sending link to node send directlink cost for update
-
 
     /**
      * Creates a routing update message for the receiver
