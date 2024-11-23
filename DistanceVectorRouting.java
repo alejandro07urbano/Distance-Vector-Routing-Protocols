@@ -3,24 +3,19 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Scanner;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 
 /**
  * This will be our driver class which will listen for user input.
  */
 public class DistanceVectorRouting {
     public static int routingUpdateInterval;
-    public static boolean waitingForInput;
 
     public static void main(String[] args) {
         Scanner input = new Scanner(System.in);
 
         while(true) {
-            waitingForInput = true;
             System.out.print(">> ");
             String line = input.nextLine();
-            waitingForInput = false;
             String[] inputs = line.split(" ");
 
             switch(inputs[0]) {
@@ -55,7 +50,7 @@ public class DistanceVectorRouting {
     }
 
     // Safely print a message and preserve the user's input
-    public static void printMessageFromThread(String s) {
+    public static synchronized void printMessageFromThread(String s) {
         StringBuilder sb = new StringBuilder();
         sb.append(s);
         sb.append("\n>> ");

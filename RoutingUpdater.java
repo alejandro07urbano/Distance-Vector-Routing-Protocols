@@ -8,7 +8,7 @@ import java.util.ArrayList;
  * just an example for udp client.
  */
 public class RoutingUpdater extends Thread {
-    private DatagramSocket socket;
+    private static DatagramSocket socket;
     private InetAddress address;
     public static boolean isRunning;
     public static int updateInterval;
@@ -32,23 +32,45 @@ public class RoutingUpdater extends Thread {
     @Override
     public void run() {
         isRunning = true;
-        ArrayList<ServerNode> servers = Server.servers;
         while(isRunning) {
             try{
                 Thread.sleep(1000*updateInterval);
             } catch(InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            for(ServerNode server : servers) {
-                if(!server.isNeighbor()) continue;
-                while(Server.updatingValues); // wait for distance vector to finish to avoid incomplete data
-                try{
+            sendUpdateToNeighbors();
+        }
+    }
+
+    public static void sendUpdateToNeighbors() {
+        ArrayList<ServerNode> neighborsToTimeout = new ArrayList<>();
+
+        synchronized (Server.servers) {
+            ArrayList<ServerNode> servers = Server.servers;
+            for (ServerNode server : servers) {
+                if (!server.isNeighbor()) continue;
+
+                if (server.isTimedOut(updateInterval)) {
+                    neighborsToTimeout.add(server);
+                }
+            }
+        }
+
+        for (ServerNode server : neighborsToTimeout) {
+            neighborTimeout(server);
+        }
+
+        synchronized (Server.servers) {
+            ArrayList<ServerNode> servers = Server.servers;
+            for (ServerNode server : servers) {
+                if (!server.isNeighbor() || server.isTimedOut(updateInterval)) continue;
+
+                try {
                     byte[] routingUpdate = getMessageAsPacket(server.serverID);
                     InetAddress address = InetAddress.getByName(server.serverIPAddress);
-                    DatagramPacket packet = new DatagramPacket(routingUpdate,
-                                            routingUpdate.length,
-                                            address,
-                            server.serverPort);
+                    DatagramPacket packet = new DatagramPacket(
+                            routingUpdate, routingUpdate.length, address, server.serverPort
+                    );
                     socket.send(packet);
 
                 } catch (IOException e) {
@@ -57,19 +79,31 @@ public class RoutingUpdater extends Thread {
             }
         }
     }
+
     //Alejandro Urbano 
      public static void disableServerLink(int serverId){
-        ServerNode serverToDisable = Server.getServer(serverId);
-        if(serverToDisable != null && serverToDisable.isNeighbor()){
-            serverToDisable.directLinkCost = Integer.MAX_VALUE;
-            if(serverToDisable.nextHopId == serverId) serverToDisable.nextHopId =-1;
-
-            System.out.println("Server link to " + serverId + " has been disabled.");
-        }
-        else{
-            System.out.println("Server " + serverId + " is not a neighbor or does not exist.");
+        synchronized (Server.servers) {
+            ServerNode serverToDisable = Server.getServer(serverId);
+            if(serverToDisable != null && serverToDisable.isNeighbor()){
+                serverToDisable.directLinkCost = Integer.MAX_VALUE;
+                Server.removePath(serverId);
+                System.out.println("Server link to " + serverId + " has been disabled.");
+                sendUpdateToNeighbors();
+            }
+            else{
+                System.out.println("Server " + serverId + " is not a neighbor or does not exist.");
+            }
         }
      }
+
+    public static void neighborTimeout(ServerNode server) {
+        synchronized (Server.servers) {
+            DistanceVectorRouting.printMessageFromThread("Node " + server.serverID + " has timed out.");
+            server.directLinkCost = Integer.MAX_VALUE;
+            Server.removePath(server.serverID);
+            Server.displayRoutingTable();
+        }
+    }
 
     //Alejandro Urbano
     public static void CrashServer(){
@@ -83,7 +117,7 @@ public class RoutingUpdater extends Thread {
      * @param id Receiving server's id
      * @return
      */
-    public byte[] getMessageAsPacket(int id) {
+    public static byte[] getMessageAsPacket(int id) {
         RoutingUpdateMessage message = new RoutingUpdateMessage(
                 id,
                 2+Server.servers.size()*4,
@@ -92,24 +126,6 @@ public class RoutingUpdater extends Thread {
                 Server.servers
         );
         return message.getRoutingUpdatePacket();
-    }
-
-
-    public String sendEcho(String msg) {
-        try {
-            buf = msg.getBytes();
-            DatagramPacket packet
-                    = new DatagramPacket(buf, buf.length, address, 4445);
-            socket.send(packet);
-            buf = new byte[256];
-            packet = new DatagramPacket(buf, buf.length);
-            socket.receive(packet);
-            String received = new String(
-                    packet.getData(), 0, packet.getLength());
-            return received;
-        } catch(IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     public void close() {

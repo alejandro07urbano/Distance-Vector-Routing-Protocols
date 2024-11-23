@@ -1,8 +1,6 @@
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.File;
-import java.nio.file.Path;
-import java.sql.Array;
 import java.util.*;
 import java.net.*;
 
@@ -61,7 +59,7 @@ public class Server extends Thread {
             }
             RoutingUpdateMessage message = new RoutingUpdateMessage(packet.getData());
             distanceVector(message);
-            packetCount++;
+
         }
         socket.close();
     }
@@ -75,27 +73,55 @@ public class Server extends Thread {
      * @see RoutingUpdateMessage
      */
     public void distanceVector(RoutingUpdateMessage message) {
-        updatingValues = true;
-        int senderId = message.getSenderID();
-        ServerNode senderServer = getServer(senderId);
+        synchronized (servers) {
+            int senderId = message.getSenderID();
+            ServerNode senderServer = getServer(senderId);
 
+            if(!senderServer.isNeighbor()) return;
+            senderServer.timeStamp = System.currentTimeMillis();
+            packetCount++;
 
-        DistanceVectorRouting.printMessageFromThread("RECEIVED A MESSAGE FROM SERVER " + senderId);
-        int senderCost = senderServer.cost;
-        ArrayList<ServerNode> updateServers = message.serverNodes;
-        for(ServerNode destination : servers) {
-            if(destination.serverID == serverId) continue;
-            for(ServerNode updateServer : updateServers) {
-                if(destination.serverID != updateServer.serverID) continue;
-                int newCost = (updateServer.cost == Integer.MAX_VALUE) ? Integer.MAX_VALUE :
-                                                                        senderCost + updateServer.cost;
-                if(newCost < destination.cost) {
-                    destination.cost = newCost;
-                    destination.nextHopId = senderId;
+            int senderCost = (senderServer.cost == Integer.MAX_VALUE) ? senderServer.directLinkCost :
+                    senderServer.cost;
+            ArrayList<ServerNode> updateServers = message.serverNodes;
+            for(ServerNode destination : servers) {
+                if(destination.serverID == serverId) continue;
+                for(ServerNode updateServer : updateServers) {
+                    if(destination.serverID != updateServer.serverID) continue;
+
+                    int newCost = (updateServer.cost == Integer.MAX_VALUE)
+                            ? Integer.MAX_VALUE : senderCost + updateServer.cost;
+
+                    if(senderId == destination.nextHopId ) {
+                        if(destination.cost != newCost) {
+                            destination.cost = newCost;
+                            destination.nextHopId = (newCost == Integer.MAX_VALUE) ? -1 : senderId;
+                        }
+                    }
+
+                    else if (newCost < destination.cost || destination.cost == Integer.MAX_VALUE) {
+                        destination.cost = newCost;
+                        destination.nextHopId = (newCost == Integer.MAX_VALUE) ? -1 : senderId;
+
+                        DistanceVectorRouting.printMessageFromThread("RECEIVED A MESSAGE FROM SERVER " + senderId);
+                        displayRoutingTable();
+                    }
                 }
             }
         }
-        updatingValues = false;
+    }
+
+    public static void removePath(int pathId) {
+        synchronized (servers) {
+            for (ServerNode server : servers) {
+                if (server.serverID == serverId) continue;
+
+                if (pathId == server.serverID || server.nextHopId == pathId) {
+                    server.cost = Integer.MAX_VALUE;
+                    server.nextHopId = -1;
+                }
+            }
+        }
     }
 
     /**
@@ -181,9 +207,11 @@ public class Server extends Thread {
     // Display the routing table
     public static void displayRoutingTable() {
         // Display the sorted routing table
-        System.out.println("Routing Table:");
-        for (ServerNode node : servers) {
-            System.out.println(node);
+        synchronized (servers) {
+            System.out.println("Routing Table:");
+            for (ServerNode node : servers) {
+                System.out.println(node);
+            }
         }
     }
 
@@ -251,33 +279,37 @@ public class Server extends Thread {
      * @return Returns a boolean signifying whether it could insert.
      */
     private boolean addServer(ServerNode server) {
-        int position = Collections.binarySearch(servers, server, Comparator.comparingInt(s -> s.serverID));
-        if (position < 0) {
-            position = -position - 1;
+        synchronized (servers) {
+            int position = Collections.binarySearch(servers, server, Comparator.comparingInt(s -> s.serverID));
+            if (position < 0) {
+                position = -position - 1;
+            }
+            else {
+                return false;
+            }
+            servers.add(position, server);
+            return true;
         }
-        else {
-            return false;
-        }
-        servers.add(position, server);
-        return true;
     }
 
     public static ServerNode getServer(int id) {
-        int high = servers.size()-1;
-        int low = 0;
-        while(low <= high) {
-            int mid = low + (high - low) / 2;
-            ServerNode server = servers.get(mid);
-            if(server.serverID == id) {
-                return server;
+        synchronized (servers) {
+            int high = servers.size()-1;
+            int low = 0;
+            while(low <= high) {
+                int mid = low + (high - low) / 2;
+                ServerNode server = servers.get(mid);
+                if(server.serverID == id) {
+                    return server;
+                }
+                if(server.serverID < id) {
+                    low = mid + 1;
+                }
+                else {
+                    high = mid - 1;
+                }
             }
-            if(server.serverID < id) {
-                low = mid + 1;
-            }
-            else {
-                high = mid - 1;
-            }
+            return null;
         }
-        return null;
     }
 }

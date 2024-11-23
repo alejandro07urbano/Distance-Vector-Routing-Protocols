@@ -31,19 +31,21 @@ public class RoutingUpdateMessage {
             String ip = intToIp(buffer.getInt());
             int port = buffer.getShort() & 0xFFFF;
             int id = buffer.getShort() & 0xFFFF;
-            int cost = buffer.getShort() & 0xFFFF;
+            int cost = buffer.getInt();
             this.serverNodes.add(new ServerNode(ip, port, id, cost));
         }
     }
 
     public int getPacketSize() {
-        return 8 + serverNodes.size() * 10;
+        int headerSize = 8;
+        int serverNodeSize = 12;
+        return headerSize + (serverNodes.size() * serverNodeSize);
     }
 
     public int getSenderID() {
         for(ServerNode entry : serverNodes) {
             if(entry.serverIPAddress.equals(this.serverIPAddress)
-            && entry.serverPort == this.serverPort
+                    && entry.serverPort == this.serverPort
             ) return entry.serverID;
         }
         return -1;
@@ -60,7 +62,7 @@ public class RoutingUpdateMessage {
             buffer.putInt(ipToBytes(server.serverIPAddress));
             buffer.putShort((short)server.serverPort);
             buffer.putShort((short)server.serverID);
-            buffer.putShort((short)cost);
+            buffer.putInt(cost);
         }
         return buffer.array();
     }
@@ -84,5 +86,14 @@ public class RoutingUpdateMessage {
                 ipAddress & 0xFF);
     }
 
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("sender id: " + getSenderID() + "\n\n");
+        for(ServerNode node : serverNodes) {
+            sb.append("ID: " + node.serverID + "\n")
+                .append("cost: " + node.cost + "\n");
+        }
+        return sb.toString();
+    }
 
 }
