@@ -84,9 +84,7 @@ public class Server extends Thread {
             ArrayList<ServerNode> updateServers = message.serverNodes;
             if(!updateDirectPath(senderServer, updateServers)) return;
 
-            int senderCost = (senderServer.cost == Integer.MAX_VALUE) ? senderServer.directLinkCost :
-                    senderServer.cost;
-
+            int senderCost = senderServer.directLinkCost;
             for(ServerNode destination : servers) {
                 if(destination.serverID == serverId) continue;
                 for(ServerNode updateServer : updateServers) {
@@ -118,7 +116,6 @@ public class Server extends Thread {
         for(ServerNode updateServer : updateServers) {
             if(updateServer.serverID != serverId) continue;
             if(updateServer.cost == Integer.MIN_VALUE) {
-                DistanceVectorRouting.printMessageFromThread("Removing " + senderServer.serverID);
                 senderServer.directLinkCost = Integer.MAX_VALUE;
                 removePath(senderServer.serverID);
                 return false;

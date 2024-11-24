@@ -54,14 +54,11 @@ public class RoutingUpdater extends Thread {
                     neighborsToTimeout.add(server);
                 }
             }
-        }
 
-        for (ServerNode server : neighborsToTimeout) {
-            neighborTimeout(server);
-        }
+            for (ServerNode server : neighborsToTimeout) {
+                neighborTimeout(server);
+            }
 
-        synchronized (Server.servers) {
-            ArrayList<ServerNode> servers = Server.servers;
             for (ServerNode server : servers) {
                 if (!server.isNeighbor() || server.isTimedOut(updateInterval)) continue;
 
@@ -88,7 +85,6 @@ public class RoutingUpdater extends Thread {
                 serverToDisable.directLinkCost = Integer.MAX_VALUE;
                 Server.removePath(serverId);
                 System.out.println("Server link to " + serverId + " has been disabled.");
-                sendUpdateToNeighbors();
             }
             else{
                 System.out.println("Server " + serverId + " is not a neighbor or does not exist.");
@@ -97,12 +93,10 @@ public class RoutingUpdater extends Thread {
      }
 
     public static void neighborTimeout(ServerNode server) {
-        synchronized (Server.servers) {
-            DistanceVectorRouting.printMessageFromThread("Node " + server.serverID + " has timed out.");
-            server.directLinkCost = Integer.MAX_VALUE;
-            Server.removePath(server.serverID);
-            Server.displayRoutingTable();
-        }
+        DistanceVectorRouting.printMessageFromThread("Node " + server.serverID + " has timed out.");
+        server.directLinkCost = Integer.MAX_VALUE;
+        Server.removePath(server.serverID);
+        Server.displayRoutingTable();
     }
 
     private static void sendUpdateToNeighbor(ServerNode neighbor) {
