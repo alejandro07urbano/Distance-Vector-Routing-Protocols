@@ -18,11 +18,25 @@ public class DistanceVectorRouting {
             String line = input.nextLine();
             String[] inputs = line.split(" ");
             String command = inputs[0].trim().toLowerCase();
+            //Alejandro Urbano 
+            //Pre-validation: Validate the command and input arguments 
+            if(isValidCommand(inputs)){
+                continue;
+
+            }
             switch(command) {
                 case "server":
                     if(inputs[1].equals("-t") && inputs.length > 2) {
-                        readTopology(inputs[2]);
+                        //Alejandro Urbano
+                        if (isValidFile(inputs[2])) {
+                            readTopology(inputs[2]); 
+                            //Display sucess message 
+                            System.out.println("server SUCESS");
+                        
+                    }else{
+                        System.out.println("Invalid file name");
                     }
+                }
                     if(inputs.length > 4 && inputs[3].equals("-i")) {
                         routingUpdateInterval = Integer.parseInt(inputs[4]);
                         RoutingUpdater ru = new RoutingUpdater(routingUpdateInterval);
@@ -35,17 +49,24 @@ public class DistanceVectorRouting {
                         int neighborId = Integer.parseInt(inputs[2]);
                         String newCost = inputs[3];
                         RoutingUpdater.updateLink(serverId, neighborId, newCost);
+                        //Display sucess message 
+                        System.out.println("update SUCCESS");
                     }
                     break;
                 case "display":
                     Server.displayRoutingTable();
+                    System.out.println("display SUCESS");
                     break;
                 case "packets":
                     packets();
+                    //Display the sucess message 
+                    System.out.println("packets SUCESS");
                     break;
                 case "disable":
                     if(inputs.length > 1) {
                         RoutingUpdater.disableServerLink(Integer.parseInt(inputs[1]));
+                        //Display sucess message 
+                        System.out.println("disable SUCESS");
                     }
                     break;
                 case "crash":
@@ -56,6 +77,7 @@ public class DistanceVectorRouting {
             }
         }
     }
+
 
     // Safely print a message and preserve the user's input
     public static synchronized void printMessageFromThread(String s) {
@@ -98,4 +120,71 @@ public class DistanceVectorRouting {
             e.printStackTrace();
         }
     }
+     // Validate that the file name is not null or empty
+     private static boolean isValidFile(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            System.out.println("File name cannot be null or empty.");
+            return false;       
+}
+//Additional file checking 
+return true;
+}
+// Validate the command and its arguments
+private static boolean isValidCommand(String[] inputs) {
+    // Validate the 'server' command
+    if ("server".equals(inputs[0])) {
+        if (inputs.length < 3 || !"-t".equals(inputs[1])) {
+            System.out.println("Usage: server -t <topology-file> [-i <interval>]");
+            return true;
+        }
+        // If '-i' is provided, check if it's followed by a valid integer
+        if (inputs.length > 4 && "-i".equals(inputs[3])) {
+            try {
+                routingUpdateInterval = Integer.parseInt(inputs[4]);
+            } catch (NumberFormatException e) {
+                System.out.println("Interval must be a valid integer.");
+                return true;
+            }
+        }
+    }
+
+    // Validate the 'update' command
+    if ("update".equals(inputs[0])) {
+        if (inputs.length != 4) {
+            System.out.println("Usage: update <server-id> <neighbor-id> <cost>");
+            return true;
+        }
+        try {
+            Integer.parseInt(inputs[1]); // Server ID
+            Integer.parseInt(inputs[2]); // Neighbor ID
+        } catch (NumberFormatException e) {
+            System.out.println("Server ID and Neighbor ID must be integers.");
+            return true;
+        }
+    }
+
+    // Validate the 'disable' command
+    if ("disable".equals(inputs[0])) {
+        if (inputs.length < 2) {
+            System.out.println("Usage: disable <server-id>");
+            return true;
+        }
+        try {
+            Integer.parseInt(inputs[1]); // Server ID
+        } catch (NumberFormatException e) {
+            System.out.println("Server ID must be an integer.");
+            return true;
+        }
+    }
+
+    // Validate the 'crash', 'display', and 'packets' commands
+    if ("crash".equals(inputs[0]) || "display".equals(inputs[0]) || "packets".equals(inputs[0])) {
+        if (inputs.length != 1) {
+            System.out.println("Usage: " + inputs[0]);
+            return true;
+        }
+    }
+
+    return false;
+}
 }
