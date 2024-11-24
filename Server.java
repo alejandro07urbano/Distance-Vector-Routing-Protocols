@@ -81,9 +81,12 @@ public class Server extends Thread {
             senderServer.timeStamp = System.currentTimeMillis();
             packetCount++;
 
+            ArrayList<ServerNode> updateServers = message.serverNodes;
+            if(!updateDirectPath(senderServer, updateServers)) return;
+
             int senderCost = (senderServer.cost == Integer.MAX_VALUE) ? senderServer.directLinkCost :
                     senderServer.cost;
-            ArrayList<ServerNode> updateServers = message.serverNodes;
+
             for(ServerNode destination : servers) {
                 if(destination.serverID == serverId) continue;
                 for(ServerNode updateServer : updateServers) {
@@ -109,6 +112,26 @@ public class Server extends Thread {
                 }
             }
         }
+    }
+
+    private static boolean updateDirectPath(ServerNode senderServer , ArrayList<ServerNode> updateServers) {
+        for(ServerNode updateServer : updateServers) {
+            if(updateServer.serverID != serverId) continue;
+            if(updateServer.cost == Integer.MIN_VALUE) {
+                DistanceVectorRouting.printMessageFromThread("Removing " + senderServer.serverID);
+                senderServer.directLinkCost = Integer.MAX_VALUE;
+                removePath(senderServer.serverID);
+                return false;
+            }
+
+            senderServer.directLinkCost = updateServer.cost;
+            if(senderServer.nextHopId == senderServer.serverID) senderServer.cost = updateServer.cost;
+            else if(updateServer.cost < senderServer.cost) {
+                senderServer.cost = updateServer.cost;
+                senderServer.nextHopId = senderServer.serverID;
+            }
+        }
+        return true;
     }
 
     public static void removePath(int pathId) {

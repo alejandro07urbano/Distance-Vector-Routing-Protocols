@@ -17,8 +17,8 @@ public class DistanceVectorRouting {
             System.out.print(">> ");
             String line = input.nextLine();
             String[] inputs = line.split(" ");
-
-            switch(inputs[0]) {
+            String command = inputs[0].trim().toLowerCase();
+            switch(command) {
                 case "server":
                     if(inputs[1].equals("-t") && inputs.length > 2) {
                         readTopology(inputs[2]);
@@ -27,6 +27,14 @@ public class DistanceVectorRouting {
                         routingUpdateInterval = Integer.parseInt(inputs[4]);
                         RoutingUpdater ru = new RoutingUpdater(routingUpdateInterval);
                         if(Server.running && !ru.isRunning) ru.start();
+                    }
+                    break;
+                case "update":
+                    if(inputs.length == 4) {
+                        int serverId = Integer.parseInt(inputs[1]);
+                        int neighborId = Integer.parseInt(inputs[2]);
+                        String newCost = inputs[3];
+                        RoutingUpdater.updateLink(serverId, neighborId, newCost);
                     }
                     break;
                 case "display":

@@ -105,6 +105,47 @@ public class RoutingUpdater extends Thread {
         }
     }
 
+    private static void sendUpdateToNeighbor(ServerNode neighbor) {
+        if(neighbor.isTimedOut(updateInterval)) return;
+        try {
+            byte[] routingUpdate = getMessageAsPacket(neighbor.serverID);
+            InetAddress address = InetAddress.getByName(neighbor.serverIPAddress);
+            DatagramPacket packet = new DatagramPacket(
+                    routingUpdate, routingUpdate.length, address, neighbor.serverPort
+            );
+            socket.send(packet);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void updateLink(int serverId, int neighborId, String newCost) {
+        synchronized (Server.servers) {
+            if(serverId != Server.serverId) return;
+            ServerNode serverToUpdate = Server.getServer(neighborId);
+            if(serverToUpdate != null && serverToUpdate.isNeighbor()) {
+                int cost = 0;
+                if(newCost.equalsIgnoreCase("inf")){
+                    serverToUpdate.directLinkCost = Integer.MIN_VALUE;
+                    sendUpdateToNeighbor(serverToUpdate);
+                    serverToUpdate.directLinkCost = Integer.MAX_VALUE;
+                    Server.removePath(neighborId);
+                    return;
+                }
+                else cost = Integer.parseInt(newCost);
+
+                serverToUpdate.directLinkCost = cost;
+                if(serverToUpdate.nextHopId == neighborId) serverToUpdate.cost = cost;
+                else if(cost < serverToUpdate.cost) {
+                    serverToUpdate.cost = cost;
+                    serverToUpdate.nextHopId = neighborId;
+                }
+                sendUpdateToNeighbor(serverToUpdate);
+            }
+        }
+    }
+
     //Alejandro Urbano
     public static void CrashServer(){
         isRunning = false;
