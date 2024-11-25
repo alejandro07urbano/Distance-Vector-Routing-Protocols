@@ -76,6 +76,15 @@ public class DistanceVectorRouting {
                 case "packets":
                     packets();
                     break;
+                case "step":
+                    if(Server.running && RoutingUpdater.isRunning) {
+                        RoutingUpdater.sendUpdateToNeighbors();
+                        System.out.println("step SUCCESS");
+                    }
+                    else {
+                        System.out.println("step ERROR: This server is no longer running because crash was called.");
+                    }
+                    break;
                 case "disable":
                     if(Server.running && RoutingUpdater.isRunning) {
                         RoutingUpdater.disableServerLink(Integer.parseInt(inputs[1]));
@@ -193,7 +202,7 @@ public class DistanceVectorRouting {
         }
 
         // Validate the 'crash', 'display', and 'packets' commands
-        if ("crash".equals(inputs[0]) || "display".equals(inputs[0]) || "packets".equals(inputs[0])) {
+        if ("crash".equals(inputs[0]) || "display".equals(inputs[0]) || "packets".equals(inputs[0]) || "step".equals(inputs[0])) {
             if (inputs.length != 1) {
                 System.out.println(inputs[0] + " ERROR: Wrong usage"+"\nUsage: " + inputs[0]);
                 return false;
