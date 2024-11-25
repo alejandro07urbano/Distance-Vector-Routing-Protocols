@@ -1,6 +1,10 @@
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
+/**
+ * A class that contains all information a routing update message.
+ * This class is used to read and create routing update messages.
+ */
 public class RoutingUpdateMessage {
     int numberOfUpdateFields;
     int serverPort;
@@ -8,10 +12,16 @@ public class RoutingUpdateMessage {
 
     int receiverId;
 
-    int messageSize;
-
     ArrayList<ServerNode> serverNodes;
 
+    /**
+     * A constructor to create a routing update message
+     * @param receiverId The id of the receiving server
+     * @param numberOfUpdateFields The number of update fields in the message
+     * @param serverPort The port number of this server
+     * @param serverIPAddress The ip of this server
+     * @param routingEntries The routing table of this server
+     */
     public RoutingUpdateMessage(int receiverId, int numberOfUpdateFields, int serverPort, String serverIPAddress, ArrayList<ServerNode> routingEntries) {
         this.receiverId = receiverId;
         this.numberOfUpdateFields = numberOfUpdateFields;
@@ -19,6 +29,11 @@ public class RoutingUpdateMessage {
         this.serverIPAddress = serverIPAddress;
         this.serverNodes = routingEntries;
     }
+
+    /**
+     * Constructor to read a routing update packet
+     * @param packet A byte array containing the routing update message
+     */
     public RoutingUpdateMessage(byte[] packet) {
         ByteBuffer buffer = ByteBuffer.wrap(packet);
         this.numberOfUpdateFields = buffer.getShort() & 0xFFFF;
@@ -36,12 +51,21 @@ public class RoutingUpdateMessage {
         }
     }
 
+    /**
+     * Method to determine the size of a packet
+     * @return Returns the size of this packet
+     */
     public int getPacketSize() {
         int headerSize = 8;
         int serverNodeSize = 12;
         return headerSize + (serverNodes.size() * serverNodeSize);
     }
 
+    /**
+     * Finds the id of the sender by using
+     * the ip and port in the header.
+     * @return Returns the id of the sender
+     */
     public int getSenderID() {
         for(ServerNode entry : serverNodes) {
             if(entry.serverIPAddress.equals(this.serverIPAddress)
@@ -51,6 +75,12 @@ public class RoutingUpdateMessage {
         return -1;
     }
 
+    /**
+     * Creates a routing update packet using a byte buffer.
+     * All values are written to this buffer, then the
+     * byte array is returned.
+     * @return Returns a byte array of the message
+     */
     public byte[] getRoutingUpdatePacket() {
         ByteBuffer buffer = ByteBuffer.allocate(getPacketSize());
         buffer.putShort((short)numberOfUpdateFields);
@@ -67,7 +97,13 @@ public class RoutingUpdateMessage {
         return buffer.array();
     }
 
-    // Utility function to convert IP address string to integer
+    /**
+     * A utility function to turn a string ip into
+     * an integer. This is done so that it can be
+     * added to the packet.
+     * @param ipAddress The ip as a string
+     * @return Returns the ip stored in an integer
+     */
     public static int ipToBytes(String ipAddress) {
         String[] octets = ipAddress.split("\\.");
         int ip = 0;
@@ -77,7 +113,13 @@ public class RoutingUpdateMessage {
         return ip;
     }
 
-    // Utility function to convert integer to IP address string
+    /**
+     * Reads an ip that was stored in an integer.
+     * This is done to read the ip that comes from
+     * a packet.
+     * @param ipAddress Ip stored in an integer
+     * @return Returns the ip as string
+     */
     public static String intToIp(int ipAddress) {
         return String.format("%d.%d.%d.%d",
                 (ipAddress >> 24) & 0xFF,

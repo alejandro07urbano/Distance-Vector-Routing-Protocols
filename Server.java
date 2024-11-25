@@ -19,9 +19,7 @@ public class Server extends Thread {
     private int numOfServers;
     private int numOfNeighbors;
     public static int serverId;
-    public int numOfUpdates = 0;
     public static String ipAddress;
-    public static boolean updatingValues;
 
     public static int packetCount;
 
@@ -31,24 +29,29 @@ public class Server extends Thread {
      * topology file.
      */
     public Server() {
-        updatingValues = false;
+        servers = new ArrayList<>();
         running = false;
         packetCount = 0;
     }
 
     /**
-     * Will be used to receive distance vector updates from the server's
-     * neighbors.
+     * This is a new thread that listens for routing update messages from this
+     * server's neighbors.
      */
     public void run() {
-        running = true;
         ServerNode server = getServer(serverId);
         try {
             socket = new DatagramSocket(server.serverPort);
-        } catch (SocketException e) {
+
+        } catch (BindException e) {
+            System.err.println("ERROR: The port " + server.serverPort + " is already in use");
+            System.exit(1);
+        }
+        catch (SocketException e) {
             throw new RuntimeException(e);
         }
-
+        running = true;
+        System.out.println("Server started successfully");
         while (running) {
             DatagramPacket packet
                     = new DatagramPacket(buf, buf.length);
@@ -68,8 +71,9 @@ public class Server extends Thread {
      * Searches for better path from vector updates received from its neighbors.
      * It works by looking through the current routing table and comparing it with
      * the one received through the message. If it finds a better path, it will
-     * update the cost and change the next hop id.
-     * @param message The vector update message
+     * update the cost and change the next hop id. This also updates existing paths
+     * if they were changed.
+     * @param message The routing update message
      * @see RoutingUpdateMessage
      */
     public void distanceVector(RoutingUpdateMessage message) {
@@ -84,6 +88,7 @@ public class Server extends Thread {
             ArrayList<ServerNode> updateServers = message.serverNodes;
             if(!updateDirectPath(senderServer, updateServers)) return;
 
+            DistanceVectorRouting.printMessageFromThread("RECEIVED A MESSAGE FROM SERVER " + senderId);
             int senderCost = senderServer.directLinkCost;
             for(ServerNode destination : servers) {
                 if(destination.serverID == serverId) continue;
@@ -103,16 +108,21 @@ public class Server extends Thread {
                     else if (newCost < destination.cost || destination.cost == Integer.MAX_VALUE) {
                         destination.cost = newCost;
                         destination.nextHopId = (newCost == Integer.MAX_VALUE) ? -1 : senderId;
-
-                        DistanceVectorRouting.printMessageFromThread("RECEIVED A MESSAGE FROM SERVER " + senderId);
-                        displayRoutingTable();
                     }
                 }
             }
         }
     }
 
-    private static boolean updateDirectPath(ServerNode senderServer , ArrayList<ServerNode> updateServers) {
+    /**
+     * This updates the direct link from a server. This is called within the distanceVector
+     * method before values are updated. This is done so that the latest link is used when
+     * comparing paths.
+     * @param senderServer The server that is updating the link
+     * @param updateServers The servers routing table to find the direct link
+     * @return Returns false if link was removed
+     */
+    private static boolean updateDirectPath(ServerNode senderServer, ArrayList<ServerNode> updateServers) {
         for(ServerNode updateServer : updateServers) {
             if(updateServer.serverID != serverId) continue;
             if(updateServer.cost == Integer.MIN_VALUE) {
@@ -131,6 +141,13 @@ public class Server extends Thread {
         return true;
     }
 
+    /**
+     * Removes the path of a server from the routing table. It does this
+     * by looking through the routing table and comparing the next hop id
+     * with the path id. If they are equal, the path is reset to inf and the
+     * next hop is set to -1.
+     * @param pathId The id of the server that will be removed from the routing table
+     */
     public static void removePath(int pathId) {
         synchronized (servers) {
             for (ServerNode server : servers) {
@@ -145,13 +162,11 @@ public class Server extends Thread {
     }
 
     /**
-     * Validates the server id that was found in the topology file. It does this
-     * by calling a function that checks for the ip of the server and looks for it
-     * in the list of servers. If the id is found, it will check if the id matches
-     * the last lines of the topology file where neighbor cost is defined.
+     * Checks if the computers ip is found in the topology file. It
+     * also checks if the neighbor lines have the correct id.
      * @return Returns a string that describes any error
      */
-    private String validateServerId() {
+    private String validateServerIP() {
         String serverIP = getIPAddress();
         ServerNode server = getServer(serverId);
 
@@ -167,6 +182,13 @@ public class Server extends Thread {
         return "SUCCESS";
     }
 
+    /**
+     * Finds the computers ip from the topology file. It does this
+     * by comparing every ipv4 address from the computer with every ip
+     * in the topology file. This is done just in case there is
+     * more ipv4 addresses that are not currently used like wsl ip address.
+     * @return Returns the ip found in the topology file
+     */
     private String getIPAddress() {
         ArrayList<String> ips = getIPAddresses();
         for(ServerNode server : servers) {
@@ -179,8 +201,9 @@ public class Server extends Thread {
     }
 
     /**
-     * Gets the IP of the computer running the server.
-     * @return Will return an ipv4 address of the computer running the server
+     * Looks through all addresses on the computer, makes sure they are not loopback,
+     * and makes sure they are ipv4 addresses.
+     * @return Will return all ipv4 addresses of the computer
      */
     private static ArrayList<String> getIPAddresses() {
         ArrayList<String> ips = new ArrayList<>();
@@ -207,28 +230,14 @@ public class Server extends Thread {
     }
 
     /**
-     * Gets the server id from the topology file, it does this by looking for the
-     * server's ip address in the list of servers that was listed in the topology file.
-     * If found it will return the id, if not, it will return -1;
-     * @return Will return the id of the server.
+     * Prints out the routing table for this server.
+     * The ServerNode class contains a toString method
+     * which prints out a row of the routing table.
+     * @see ServerNode
      */
-    public int getServerId() {
-        int index = 1;
-        for(ServerNode server : servers) {
-            if(server.serverIPAddress.equals(ipAddress)) {
-                return server.serverID;
-            }
-            index++;
-        }
-        return -1;
-    }
-
-
-    // Display the routing table
     public static void displayRoutingTable() {
-        // Display the sorted routing table
         synchronized (servers) {
-            System.out.println("Routing Table:");
+            System.out.println("Routing Table for " +serverId+":");
             for (ServerNode node : servers) {
                 System.out.println(node);
             }
@@ -248,7 +257,6 @@ public class Server extends Thread {
             numOfServers = Integer.parseInt(fileReader.nextLine());
             numOfNeighbors = Integer.parseInt(fileReader.nextLine());
 
-            servers = new ArrayList<>();
             for(int i = 0; i < numOfServers; i++) {
                 String[] lineEntry = fileReader.nextLine().split(" ");
                 int id = Integer.parseInt(lineEntry[0]);
@@ -278,9 +286,9 @@ public class Server extends Thread {
                 neighbor.directLinkCost = cost;
             }
             while(fileReader.hasNextLine())
-                if(fileReader.nextLine().trim() != "") return "ERROR: More neighbor lines than expected";
+                if(fileReader.nextLine().trim() != "") return "ERROR: More lines than expected in topology file";
             this.serverId = prevServerId;
-            return validateServerId();
+            return validateServerIP();
         }
         catch(NumberFormatException e) {
             return "ERROR: Topology file expected a numeric value";
@@ -295,8 +303,10 @@ public class Server extends Thread {
 
     /**
      * Inserts the server in the list to maintain a sorted list.
+     * This is done so that the routing table printed in sorted order
+     * by id.
      * @param server
-     * @return Returns a boolean signifying whether it could insert.
+     * @return Returns a boolean signifying whether it could be inserted.
      */
     private boolean addServer(ServerNode server) {
         synchronized (servers) {
@@ -312,6 +322,11 @@ public class Server extends Thread {
         }
     }
 
+    /**
+     * Gets a server from the routing table by their id.
+     * @param id The id of the server
+     * @return Returns a ServerNode from the routing table
+     */
     public static ServerNode getServer(int id) {
         synchronized (servers) {
             int high = servers.size()-1;

@@ -10,7 +10,33 @@ import java.util.Scanner;
 public class DistanceVectorRouting {
     public static int routingUpdateInterval;
 
+    /**
+     * Takes command line arguments to get the topology
+     * file name and the routing interval. This
+     * method also listens for user input and calls
+     * appropriate methods for the command.
+     * @param args Includes topology name and routing interval
+     */
     public static void main(String[] args) {
+        if(args.length == 4) {
+            if(!args[0].equalsIgnoreCase("-t")){
+                System.err.println("Error: first argument must be -t");
+                System.exit(1);
+            }
+            if(!args[2].equalsIgnoreCase("-i")){
+                System.err.println("Error: third argument must be -i");
+                System.exit(1);
+            }
+            readTopology(args[1]);
+            routingUpdateInterval = Integer.parseInt(args[3]);
+            RoutingUpdater ru = new RoutingUpdater(routingUpdateInterval);
+            if(Server.running && !ru.isRunning) ru.start();
+        }
+        else {
+            System.err.println("Error: unexpected number of arguments");
+            System.exit(1);
+        }
+
         Scanner input = new Scanner(System.in);
 
         while(true) {
@@ -19,16 +45,6 @@ public class DistanceVectorRouting {
             String[] inputs = line.split(" ");
             String command = inputs[0].trim().toLowerCase();
             switch(command) {
-                case "server":
-                    if(inputs[1].equals("-t") && inputs.length > 2) {
-                        readTopology(inputs[2]);
-                    }
-                    if(inputs.length > 4 && inputs[3].equals("-i")) {
-                        routingUpdateInterval = Integer.parseInt(inputs[4]);
-                        RoutingUpdater ru = new RoutingUpdater(routingUpdateInterval);
-                        if(Server.running && !ru.isRunning) ru.start();
-                    }
-                    break;
                 case "update":
                     if(inputs.length == 4) {
                         int serverId = Integer.parseInt(inputs[1]);
@@ -37,8 +53,19 @@ public class DistanceVectorRouting {
                         RoutingUpdater.updateLink(serverId, neighborId, newCost);
                     }
                     break;
+                case "step":
+                    RoutingUpdater.sendUpdateToNeighbors();
+                    System.out.println("step SUCCESS");
+                    break;
                 case "display":
-                    Server.displayRoutingTable();
+                    if(!Server.running) {
+                        System.out.println("display ERROR: This server is no longer running because" +
+                                " crash was called.");
+                    }
+                    else {
+                        System.out.println("display SUCCESS");
+                        Server.displayRoutingTable();
+                    }
                     break;
                 case "packets":
                     packets();
@@ -51,13 +78,20 @@ public class DistanceVectorRouting {
                 case "crash":
                     RoutingUpdater.CrashServer();
                     break;
+                case "exit":
+                    System.exit(0);
+                    break;
                 default:
                     System.out.println(inputs[0] + " is not a command.");
             }
         }
     }
 
-    // Safely print a message and preserve the user's input
+    /**
+     * This method ensures that threads don't print out
+     * messages at the same time.
+     * @param s The message to be printed
+     */
     public static synchronized void printMessageFromThread(String s) {
         StringBuilder sb = new StringBuilder();
         sb.append(s);
@@ -66,8 +100,12 @@ public class DistanceVectorRouting {
         System.out.print(sb);
     }
 
-    // Method to display the number of packets received since the last call
+    /**
+     * Prints out the number of packets this server has
+     * received since its last call.
+     */
     public static void packets() {
+        System.out.println("packets SUCCESS");
         System.out.println("Number of distance vector packets received since last call: " + Server.packetCount);
         // Reset the packet count
         Server.packetCount = 0;
@@ -83,17 +121,19 @@ public class DistanceVectorRouting {
         try {
             URL resourceUrl = DistanceVectorRouting.class.getResource(fileName);
             if(resourceUrl == null) {
-                System.out.println("The file with named \"" +fileName+"\" was not found.");
-                return;
+                System.err.println("The file with named \"" +fileName+"\" was not found.");
+                System.exit(1);
             }
 
             Path filePath = Paths.get(resourceUrl.toURI());
             Server server = new Server();
             String status = server.readTopologyFile(filePath.toString());
-            System.out.println("server " + status);
-            if(!status.equals("SUCCESS")) return;
+
+            if(!status.equals("SUCCESS")) {
+                System.err.println(status);
+                System.exit(1);
+            }
             server.start();
-            Server.displayRoutingTable();
         } catch(URISyntaxException e) {
             e.printStackTrace();
         }
