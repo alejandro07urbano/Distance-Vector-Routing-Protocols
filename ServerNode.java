@@ -1,4 +1,3 @@
-import java.sql.Timestamp;
 
 /**
  * This class is used to store routing information about a server in the network.

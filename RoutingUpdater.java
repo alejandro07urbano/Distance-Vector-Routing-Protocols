@@ -148,7 +148,7 @@ public class RoutingUpdater extends Thread {
     public static void updateLink(int serverId, int neighborId, String newCost) {
         synchronized (Server.servers) {
             if(serverId != Server.serverId) {
-                System.out.println("update Error: server id of "+ serverId + " does not match this servers id");
+                System.out.println("update ERROR: server id of "+ serverId + " does not match this servers id");
                 return;
             }
             ServerNode serverToUpdate = Server.getServer(neighborId);
@@ -185,7 +185,6 @@ public class RoutingUpdater extends Thread {
     }
 
     //Alejandro Urbano
-
     /**
      * Simulates a server crash by stopping the server
      * from sending and receiving routing update messages.
